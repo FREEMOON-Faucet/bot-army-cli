@@ -1,8 +1,8 @@
 # bot-army-cli
 
-## Website
+## Web App
 
-Visit the [FREEMOON Faucet](https://freemoonfaucet.xyz)
+Visit the [FREEMOON Faucet](https://freemoonfaucet.xyz) web app
 
 ## Features
 
