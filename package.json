@@ -1,0 +1,19 @@
+{
+  "name": "bot-army-cli",
+  "version": "1.0.0",
+  "description": "Run a FREEMOON Faucet bot army from the command line. Includes features not available in the graphic user interface.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FREEMOON-Faucet/bot-army-cli.git"
+  },
+  "author": "Paddy Curé",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/FREEMOON-Faucet/bot-army-cli/issues"
+  },
+  "homepage": "https://github.com/FREEMOON-Faucet/bot-army-cli#readme"
+}
