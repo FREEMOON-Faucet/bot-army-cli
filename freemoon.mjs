@@ -8,19 +8,20 @@
  *  - Transfer
  *
  * Run:
- *  - Subscribe
- *  - Claim
+ *  - Subscribe                         - subscribe
+ *  - Claim                             - claim
  *
  * List:
- *  - Display public keys
- *  - Display private keys
- *  - Display balances
+ *  - Display public keys               - pubKeys
+ *  - Display private keys              - privKeys
+ *  - Display balances                  - balances
+ *  - Display number of subscribed bots - subCount
  *
  * Transfer:
- *  - Distribute FSN
- *  - Distribute FREE
- *  - Gather FSN
- *  - Gather FREE
+ *  - Distribute FSN                    - distFsn
+ *  - Distribute FREE                   - distFree
+ *  - Gather FSN                        - gathFsn
+ *  - Gather FREE                       - gathFree
  */
 
 
@@ -28,12 +29,14 @@ import { program } from "commander/esm.mjs"
 import { ethers } from "ethers"
 import dotenv from "dotenv"
 
+import { freeAddr, faucetAddr } from "./addresses.mjs"
+import erc20Abi from "./abi/ERC20.mjs"
+import faucetAbi from "./abi/faucet.mjs"
+
 program
     .requiredOption("-o | --operation <string>", "desired operation, can be run, list, or transfer.")
-    .option("--list-op <string>", "desired list operation, can be balances, private keys, or public keys.")
-    .option("--run-op <string", "desired run operation, can be subscribe or claim.")
-    .option("--transfer-op <string>", "desired transfer operation, can be distFsn, distFree, gatherFsn, or gatherFree.")
-    .option("-n | --number <number>", "specified number of something, depending on operation argument.")
+    .option("-l | --limit <number>", "maximum value argument for a specified operation.")
+    .option("-b | --batch-size <number>", "maximum number of requests per block")
     .parse()
 
 dotenv.config()
@@ -47,46 +50,153 @@ const assert = (cond) => {
 }
 
 const connect = () => {
-    let provider = new ethers.providers.JsonRpcProvider(PROVIDER)
-    let wallet = ethers.Wallet.fromMnemonic(MNEMONIC)
-    let signer = wallet.connect(provider)
+    const provider = new ethers.providers.JsonRpcProvider(PROVIDER)
+    const wallet = ethers.Wallet.fromMnemonic(MNEMONIC)
+    const signer = wallet.connect(provider)
+    const free = new ethers.Contract(freeAddr, erc20Abi, signer)
+    const faucet = new ethers.Contract(faucetAddr, faucetAbi, signer)
 
-    return { provider, wallet, signer }
+    return { provider, wallet, signer, free, faucet }
 }
 
-const displayBots = limit => {
-    let { provider } = connect()
+const derivePub = (limit, provider) => {
+    let list = []
     for(let i = 0; i < limit; i++) {
         let wallet = ethers.Wallet.fromMnemonic(MNEMONIC, `m/44'/60'/0'/0/${ i }`)
-        console.log(`${ i + 1 }: ${ wallet.address }`)
+        let publicKey = wallet.address
+        list.push(publicKey)
+    }
+
+    return list
+}
+
+const derivePriv = (limit, provider) => {
+    let list = []
+    for(let i = 0; i < limit; i++) {
+        let wallet = ethers.Wallet.fromMnemonic(MNEMONIC, `m/44'/60'/0'/0/${ i }`)
+        let privateKey = (wallet._signingKey()).privateKey
+        list.push(privateKey)
+    }
+
+    return list
+}
+
+const subscribe = async (opts) => {}
+
+const claim = async (opts) => {}
+
+const pubKeys = (opts) => {
+    const limit = opts.limit ? opts.limit : 10
+    const { provider } = connect()
+
+    const publicKeys = derivePub(limit, provider)
+    publicKeys.forEach((pub, i) => console.log(`${ i + 1 }: ${ pub }`))
+}
+
+const privKeys = (opts) => {
+    const limit = opts.limit ? opts.limit : 10
+    const { provider } = connect()
+    
+    const privateKeys = derivePriv(limit, provider)
+    privateKeys.forEach((priv, i) => console.log(`${ i + 1 }: ${ priv }`))
+}
+
+const balances = async (opts) => {
+    const limit = opts.limit ? opts.limit : 10
+    const { provider, free } = connect()
+
+    const publicKeys = derivePub(limit, provider)
+
+    let fsnRequests = [], freeRequests = []
+    
+    for(let i = 0; i < publicKeys.length; i++) {
+        fsnRequests.push(provider.getBalance(publicKeys[ i ]))
+        freeRequests.push(free.balanceOf(publicKeys[ i ]))
+    } 
+
+    let fsnResults = await Promise.all(fsnRequests)
+    let freeResults = await Promise.all(freeRequests)
+
+    for(let i = 0; i < publicKeys.length; i++) {
+        console.log(`${ publicKeys[ i ] }: FSN: ${ ethers.utils.formatUnits(fsnResults[ i ], 18) }, FREE: ${ ethers.utils.formatUnits(freeResults[ i ], 18) }`)
     }
 }
 
-const runOps = () => {}
+const subCount = async (opts) => {
+    const limit = opts.limit ? opts.limit : 100
+    const { provider, faucet } = connect()
+    
+    let requests = []
+    let totalSubbed = 0
 
-const listOps = options => {
-    assert([
-        [ options.number, `Number argument missing.` ],
-        [ !isNaN(Number(options.number)), `Invalid argument \"${ options.number }\" for number - must be of type number.` ],
-        [ !options.runOps, `Run operation argument must not be defined.` ],
-        [ !options.transferOps, `Transfer operation must not be defined.` ]
-    ])
-    displayBots(options.number)
+    console.log(`Counting subscribed addresses up to upper limit of ${ limit * 10 } ...`)
+    
+    for(let i = 0; i < limit; i++) {
+        for(let j = 0; j < 10; j++) {
+            let currentAddr = (ethers.Wallet.fromMnemonic(MNEMONIC, `m/44'/60'/0'/0/${ totalSubbed + j }`)).address
+            requests.push(faucet.isSubscribed(currentAddr))
+        }
+
+        let results = await Promise.all(requests)
+        requests = []
+        let subscribed = results.filter(res => res)
+        totalSubbed += subscribed.length
+        if(subscribed.length < 10) break
+    }
+
+    console.log(`Total subscribed addresses: ${ totalSubbed }`)
 }
 
-const transferOps = () => {}
+const distFsn = async (opts) => {}
 
-// Check arguments
+const distFree = async (opts) => {}
+
+const gathFsn = async (opts) => {}
+
+const gathFree = async (opts) => {}
+
+
 const start = () => {
     const options = program.opts()
-    let execution = null
+    let execution
 
-    if(options.operation === "run") execution = runOps
-    else if(options.operation === "list") execution = listOps
-    else if(options.operation === "transfer") execution = transferOps
-    else throw new Error(`Invalid argument \"${ options.operation }\" for operation - must be run, list, or transfer.`)
-
-    execution(options)
+    switch(options.operation) {
+        case "subscribe":
+            execution = subscribe
+            break
+        case "claim":
+            execution = claim
+            break
+        case "pubKeys":
+            execution = pubKeys
+            break
+        case "privKeys":
+            execution = privKeys
+            break
+        case "balances":
+            execution = balances
+            break
+        case "subCount":
+            execution = subCount
+            break
+        case "distFsn":
+            execution = distFsn
+            break
+        case "distFree":
+            execution = distFree
+            break
+        case "gathFsn":
+            execution = gathFsn
+            break
+        case "gathFree":
+            execution = gathFree
+            break
+        default:
+            throw new Error(`Invalid argument \"${ options.operation }\".`)
+    }
+    
+    if(execution) execution(options)
+    else console.log(options.operation)
 }
 
 try {
