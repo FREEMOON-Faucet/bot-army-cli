@@ -5,4 +5,4 @@ const freeAddr = "0x984e4B2bE971747a1A545CFe58f564F224148dC5"
 const faucetAddr = "0x8F72b524431B359cA491981cB9fa8edA2d8483bf"
 
 
-export { freeAddr, faucetAddr }
+module.exports = { freeAddr, faucetAddr }

@@ -25,19 +25,12 @@
  */
 
 
-import { program } from "commander/esm.mjs"
-import { ethers } from "ethers"
-import dotenv from "dotenv"
+const { ethers } = require("ethers")
+const dotenv = require("dotenv")
 
-import { freeAddr, faucetAddr } from "./addresses.mjs"
-import erc20Abi from "./abi/ERC20.mjs"
-import faucetAbi from "./abi/faucet.mjs"
-
-program
-    .requiredOption("-o | --operation <string>", "desired operation, can be run, list, or transfer.")
-    .option("-l | --limit <number>", "maximum value argument for a specified operation.")
-    .option("-b | --batch-size <number>", "maximum number of requests per block")
-    .parse()
+const { freeAddr, faucetAddr } = require("./addresses.js")
+const erc20Abi = require("./abi/ERC20.js")
+const faucetAbi = require("./abi/faucet.js")
 
 dotenv.config()
 const PROVIDER = process.env.PROVIDER || "https://mainway.freemoon.xyz/gate"
@@ -85,8 +78,8 @@ const subscribe = async (opts) => {}
 
 const claim = async (opts) => {}
 
-const pubKeys = (opts) => {
-    const limit = opts.limit ? opts.limit : 10
+const pubKeys = ({ limit }) => {
+    // const limit = opts.limit ? opts.limit : 10
     const { provider } = connect()
 
     const publicKeys = derivePub(limit, provider)
@@ -155,52 +148,4 @@ const gathFsn = async (opts) => {}
 
 const gathFree = async (opts) => {}
 
-
-const start = () => {
-    const options = program.opts()
-    let execution
-
-    switch(options.operation) {
-        case "subscribe":
-            execution = subscribe
-            break
-        case "claim":
-            execution = claim
-            break
-        case "pubKeys":
-            execution = pubKeys
-            break
-        case "privKeys":
-            execution = privKeys
-            break
-        case "balances":
-            execution = balances
-            break
-        case "subCount":
-            execution = subCount
-            break
-        case "distFsn":
-            execution = distFsn
-            break
-        case "distFree":
-            execution = distFree
-            break
-        case "gathFsn":
-            execution = gathFsn
-            break
-        case "gathFree":
-            execution = gathFree
-            break
-        default:
-            throw new Error(`Invalid argument \"${ options.operation }\".`)
-    }
-    
-    if(execution) execution(options)
-    else console.log(options.operation)
-}
-
-try {
-    start()
-} catch(err) {
-    console.log(err.message)
-}
+module.exports = { pubKeys, privKeys, balances, subCount }

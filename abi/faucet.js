@@ -698,4 +698,4 @@ const faucetAbi = [
     }
   ]
 
-export default faucetAbi
+module.exports = faucetAbi

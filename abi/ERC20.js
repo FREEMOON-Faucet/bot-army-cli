@@ -221,4 +221,4 @@ const erc20Abi = [
     }
 ]
 
-export default erc20Abi
+module.exports = erc20Abi
