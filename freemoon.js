@@ -52,6 +52,29 @@ const connect = () => {
     return { provider, wallet, signer, free, faucet }
 }
 
+
+const countSubbedBots = async (limit, provider, faucet) => {
+    let requests = []
+    let totalSubbed = 0
+    
+    for(let i = 0; i < limit; i++) {
+        for(let j = 0; j < 10; j++) {
+            let currentAddr = (ethers.Wallet.fromMnemonic(MNEMONIC, `m/44'/60'/0'/0/${ totalSubbed + j }`)).address
+            requests.push(faucet.isSubscribed(currentAddr))
+        }
+
+        let results = await Promise.all(requests)
+        requests = []
+        let subscribed = results.filter(res => res)
+        totalSubbed += subscribed.length
+        if(subscribed.length < 10) break
+    }
+
+    return totalSubbed
+}
+
+
+
 const derivePub = (limit, provider) => {
     let list = []
     for(let i = 0; i < limit; i++) {
@@ -62,6 +85,8 @@ const derivePub = (limit, provider) => {
 
     return list
 }
+
+
 
 const derivePriv = (limit, provider) => {
     let list = []
@@ -74,28 +99,109 @@ const derivePriv = (limit, provider) => {
     return list
 }
 
-const subscribe = async (opts) => {}
+
+
+const subscribe = async ({ limit, gasPrice, batchSize }) => {
+    const { provider, signer, faucet } = connect()
+
+    const publicKeys = derivePub(limit, provider)
+    const totalSubbed = await countSubbedBots(limit, provider, faucet)
+    const transactionCount = await provider.getTransactionCount(publicKeys[ 0 ])
+    
+    const subCost = await faucet.subscriptionCost()
+    const currentGas = ethers.utils.parseUnits(String(gasPrice), "gwei")
+    const gasLimit = "1000000"
+
+    const fsnBal = await provider.getBalance(publicKeys[ 0 ])
+    const totalCost = subCost.mul(limit - totalSubbed).add("500000000000000000")
+    if(totalCost.gte(fsnBal)) {
+        console.log(`\nTotal Cost (+0.5 for gas): ${ ethers.utils.formatUnits(totalCost, "ether") } FSN,\nBalance: ${ ethers.utils.formatUnits(fsnBal, "ether") } FSN`)
+        
+        process.exit(1)
+    }
+ 
+    let batchStart = totalSubbed
+    let batchEnd
+    let batchNo = 0
+    let currentTx = transactionCount
+    let allBatches = []
+   
+    const subscribeBatch = (batch, n) => {
+        console.log(`Building batch ${ n } ...`)
+        let requests = batch.map((addr, i) => {
+            let txNonce = transactionCount + (n * batchSize) + i
+            console.log(`
+                address: ${ addr },
+                from: ${ publicKeys[ 0 ] },
+                gasLimit: ${ gasLimit },
+                gasPrice: ${ currentGas },
+                value: ${ subCost },
+                nonce: ${ txNonce }
+            `)
+            // return faucet.subscribe(addr, {
+            //     from: publicKeys[ 0 ],
+            //     gasLimit: "1000000",
+            //     gasPrice: currentGas,
+            //     value: subCost,
+            //     nonce: txNonce
+            // })
+        })
+        return requests
+    }
+
+    const resolveSubscriptions = async () => {
+        for(let i = 0; i < allBatches.length; i++) {
+            console.log(`Resolving ... `)
+            const results = await Promise.allSettled(allBatches[ i ])
+            const success = results.filter(res => res.status === "fulfilled").length
+            const fail = results.filter(res => res.status === "rejected").length
+
+            console.log(`Success: ${ success }, Fail: ${ fail }`)
+        }
+    }
+
+    const subscribing = setInterval(async () => {
+        let batch = []
+        batchEnd = limit > (batchStart + batchSize) ? batchStart + batchSize : limit
+        for(let i = batchStart; i < batchEnd; i++) {
+            batch.push(publicKeys[ i ])
+        }
+        let pendingBatch = subscribeBatch(batch, batchNo)
+        batchNo++
+        allBatches.push(pendingBatch)
+        batchStart = batchEnd
+        if(batchEnd === limit) {
+            clearInterval(subscribing)
+            await resolveSubscriptions()
+        }
+    }, 1000)
+}
+
+
 
 const claim = async (opts) => {}
 
+
+
 const pubKeys = ({ limit }) => {
-    // const limit = opts.limit ? opts.limit : 10
     const { provider } = connect()
 
     const publicKeys = derivePub(limit, provider)
     publicKeys.forEach((pub, i) => console.log(`${ i + 1 }: ${ pub }`))
 }
 
-const privKeys = (opts) => {
-    const limit = opts.limit ? opts.limit : 10
+
+
+const privKeys = ({ limit }) => {
     const { provider } = connect()
     
     const privateKeys = derivePriv(limit, provider)
     privateKeys.forEach((priv, i) => console.log(`${ i + 1 }: ${ priv }`))
 }
 
-const balances = async (opts) => {
-    const limit = opts.limit ? opts.limit : 10
+
+
+const balances = async ({ limit }) => {
     const { provider, free } = connect()
 
     const publicKeys = derivePub(limit, provider)
@@ -115,37 +221,34 @@ const balances = async (opts) => {
     }
 }
 
-const subCount = async (opts) => {
-    const limit = opts.limit ? opts.limit : 100
+
+
+const subCount = async ({ limit }) => {
     const { provider, faucet } = connect()
     
-    let requests = []
-    let totalSubbed = 0
-
     console.log(`Counting subscribed addresses up to upper limit of ${ limit * 10 } ...`)
-    
-    for(let i = 0; i < limit; i++) {
-        for(let j = 0; j < 10; j++) {
-            let currentAddr = (ethers.Wallet.fromMnemonic(MNEMONIC, `m/44'/60'/0'/0/${ totalSubbed + j }`)).address
-            requests.push(faucet.isSubscribed(currentAddr))
-        }
 
-        let results = await Promise.all(requests)
-        requests = []
-        let subscribed = results.filter(res => res)
-        totalSubbed += subscribed.length
-        if(subscribed.length < 10) break
-    }
+    const totalSubbed = await countSubbedBots(limit, provider, faucet)
 
     console.log(`Total subscribed addresses: ${ totalSubbed }`)
 }
 
+
+
 const distFsn = async (opts) => {}
+
+
 
 const distFree = async (opts) => {}
 
+
+
 const gathFsn = async (opts) => {}
+
+
 
 const gathFree = async (opts) => {}
 
-module.exports = { pubKeys, privKeys, balances, subCount }
+
+
+module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount }
