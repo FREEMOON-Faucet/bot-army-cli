@@ -28,16 +28,17 @@ program
     .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
     .argument("[batchSize]", "max transactions submitted per second", myParseInt, 5)
     .description("Total number of bots to subscribe, if not already subscribed")
-    .action((limit, gasPrice, batchSize) => {
+    .action(async (limit, gasPrice, batchSize) => {
         let suffix = limit === 1 ? "st" : "th"
         suffix = limit === 2 ? "nd" : suffix
         suffix = limit === 3 ? "rd" : suffix
 
         console.log(`Subscribing up to the ${ limit }${ suffix } bot, gas price is ${ gasPrice } gwei, ${ batchSize } requests per second.`)
+
         try {
-            subscribe({ limit, gasPrice, batchSize })
+            await subscribe({ limit, gasPrice, batchSize })
         } catch(err) {
-            console.log(err.message)
+            console.log(`\nError: ${ err.message }`)
         }
     })
 

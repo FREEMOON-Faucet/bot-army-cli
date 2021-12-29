@@ -100,6 +100,21 @@ const derivePriv = (limit, provider) => {
 }
 
 
+const resolveAllBatches = async (allBatches, finalMsg) => { 
+    console.log(`\n>>> Resolving requests ... `)
+    let success = 0, fail = 0
+
+    for(let i = 0; i < allBatches.length; i++) {
+        const results = await Promise.allSettled(allBatches[ i ])
+
+        success += results.filter(res => res.status === "fulfilled").length
+        fail += results.filter(res => res.status === "rejected").length
+    }
+
+    console.log(finalMsg(success, fail))
+}
+
+
 
 const subscribe = async ({ limit, gasPrice, batchSize }) => {
     const { provider, signer, faucet } = connect()
@@ -114,51 +129,31 @@ const subscribe = async ({ limit, gasPrice, batchSize }) => {
 
     const fsnBal = await provider.getBalance(publicKeys[ 0 ])
     const totalCost = subCost.mul(limit - totalSubbed).add("500000000000000000")
-    if(totalCost.gte(fsnBal)) {
-        console.log(`\nTotal Cost (+0.5 for gas): ${ ethers.utils.formatUnits(totalCost, "ether") } FSN,\nBalance: ${ ethers.utils.formatUnits(fsnBal, "ether") } FSN`)
-        
-        process.exit(1)
-    }
- 
+
+    if(limit < totalSubbed) throw new Error(`\n>>> This army has ${ totalSubbed } bots already subscribed.`)
+    if(totalCost.gte(fsnBal)) throw new Error(`\n>>> Total Cost (+0.5 for gas): ${ ethers.utils.formatUnits(totalCost, "ether") } FSN,\n>>> Balance: ${ ethers.utils.formatUnits(fsnBal, "ether") } FSN`)
+
     let batchStart = totalSubbed
     let batchEnd
-    let batchNo = 0
-    let currentTx = transactionCount
+    let batchNum = 0
     let allBatches = []
-   
-    const subscribeBatch = (batch, n) => {
-        console.log(`Building batch ${ n } ...`)
+
+    const buildTx = (batch, n) => {
+        console.log(`\n>>> Building tx batch ${ n } ...`)
         let requests = batch.map((addr, i) => {
             let txNonce = transactionCount + (n * batchSize) + i
-            console.log(`
-                address: ${ addr },
-                from: ${ publicKeys[ 0 ] },
-                gasLimit: ${ gasLimit },
-                gasPrice: ${ currentGas },
-                value: ${ subCost },
-                nonce: ${ txNonce }
-            `)
-            // return faucet.subscribe(addr, {
-            //     from: publicKeys[ 0 ],
-            //     gasLimit: "1000000",
-            //     gasPrice: currentGas,
-            //     value: subCost,
-            //     nonce: txNonce
-            // })
+            console.log(`\n\taddress: ${ addr },\n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ currentGas },\n\tvalue: ${ subCost },\n\tnonce: ${ txNonce }`)
+            return faucet.subscribe(addr, {
+                from: publicKeys[ 0 ],
+                gasLimit: "1000000",
+                gasPrice: currentGas,
+                value: subCost,
+                nonce: txNonce
+            })
         })
         return requests
     }
 
-    const resolveSubscriptions = async () => {
-        for(let i = 0; i < allBatches.length; i++) {
-            console.log(`Resolving ... `)
-            const results = await Promise.allSettled(allBatches[ i ])
-            const success = results.filter(res => res.status === "fulfilled").length
-            const fail = results.filter(res => res.status === "rejected").length
-
-            console.log(`Success: ${ success }, Fail: ${ fail }`)
-        }
-    }
 
     const subscribing = setInterval(async () => {
         let batch = []
@@ -166,13 +161,13 @@ const subscribe = async ({ limit, gasPrice, batchSize }) => {
         for(let i = batchStart; i < batchEnd; i++) {
             batch.push(publicKeys[ i ])
         }
-        let pendingBatch = subscribeBatch(batch, batchNo)
-        batchNo++
+        let pendingBatch = buildTx(batch, batchNum)
         allBatches.push(pendingBatch)
         batchStart = batchEnd
+        batchNum++
         if(batchEnd === limit) {
             clearInterval(subscribing)
-            await resolveSubscriptions()
+            await resolveAllBatches(allBatches, (s, f) => (`\n>>> Subscribing complete, ${ s } successful, ${ f } unsuccessful.`))
         }
     }, 1000)
 }
