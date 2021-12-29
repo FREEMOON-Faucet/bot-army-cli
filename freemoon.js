@@ -52,7 +52,6 @@ const connect = () => {
     return { provider, wallet, signer, free, faucet }
 }
 
-
 const countSubbedBots = async (limit, provider, faucet) => {
     let requests = []
     let totalSubbed = 0
@@ -73,8 +72,6 @@ const countSubbedBots = async (limit, provider, faucet) => {
     return totalSubbed
 }
 
-
-
 const derivePub = (limit, provider) => {
     let list = []
     for(let i = 0; i < limit; i++) {
@@ -86,8 +83,6 @@ const derivePub = (limit, provider) => {
     return list
 }
 
-
-
 const derivePriv = (limit, provider) => {
     let list = []
     for(let i = 0; i < limit; i++) {
@@ -98,7 +93,6 @@ const derivePriv = (limit, provider) => {
 
     return list
 }
-
 
 const resolveAllBatches = async (allBatches, finalMsg) => { 
     console.log(`\n>>> Resolving requests ... `)
@@ -230,6 +224,28 @@ const subCount = async ({ limit }) => {
 
 
 
+const transfer = async ({ token, amount, to, from, gasPrice }) => {
+    const { provider, free } = connect()
+    
+    const limit = from > to ? from : to
+
+    const toIndex = to - 1
+    const fromIndex = from - 1
+
+    const publicKeys = derivePub(limit)
+    const privateKeys = derivePriv(limit)
+    const wallet = new ethers.Wallet(privateKeys[ fromIndex ], provider)
+
+    console.log(`from: ${ publicKeys[ fromIndex ] } & ${ privateKeys[ fromIndex ] }, to: ${ publicKeys[ toIndex ] }`)
+
+    if(token === "FSN") {
+    } else if(token === "FREE") {
+    } else if(token === "FMN") {
+    }
+}
+
+
+
 const distFsn = async (opts) => {}
 
 
@@ -246,4 +262,4 @@ const gathFree = async (opts) => {}
 
 
 
-module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount }
+module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount, transfer }

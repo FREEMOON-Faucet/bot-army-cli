@@ -6,15 +6,22 @@ const {
     pubKeys,
     privKeys,
     balances,
-    subCount
+    subCount,
+    transfer
 } = require("./freemoon.js")
 
 
 const myParseInt = (value) => {
     const parsedValue = parseInt(value, 10)
-    if(isNaN(parsedValue)) throw new commander.InvalidArgumentError("Not a number.")
+    if(isNaN(parsedValue) || parsedValue < 0) throw new commander.InvalidArgumentError("Not a number.")
     return parsedValue
 }
+
+const myToken = (value) => {
+    if(value !== "FSN" && value !== "FREE" && value !== "FMN") throw new commander.InvalidArgumentError("Token must be \"FSN\", \"FREE\", or \"FMN\".")
+    return value
+}
+
 
 // version and description
 program
@@ -78,6 +85,25 @@ program
     .argument("[limit]", "max value", myParseInt, 10)
     .description("Count the number of subscribed bots up to a given upper limit")
     .action((limit) => subCount({ limit }))
+
+// transfer FSN, FREE, or FMN
+program
+    .command("transfer")
+    .argument("<token>", "token to transfer", myToken)
+    .argument("<amount>", "amount to transfer")
+    .argument("<to>", "index of to address", myParseInt)
+    .argument("[from]", "index of from address", myParseInt, 0)
+    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .description("Transfer either FSN, FREE, or FMN from & to specified adderss indices.")
+    .action(async (token, amount, to, from, gasPrice) => {
+        console.log(`Transferring ${ amount } ${ token } from address ${ from } to address ${ to }, gas price is ${ gasPrice } gwei.`)
+
+        try {
+            await transfer({ token, amount, to, from, gasPrice })
+        } catch(err) {
+            console.log(`\nError: ${ err.message }`)
+        }
+    })
 
 
 program.parse(process.argv)
