@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const commander = require("commander")
 const program = new commander.Command()
 const {
@@ -52,11 +54,19 @@ program
 // claim
 program
     .command("claim")
-    .argument("<limit>", "max value")
+    .argument("<limit>", "total bots to claim for every hour")
     .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
     .argument("[batchSize]", "max transactions submitted per second", myParseInt, 5)
-    .description("Total number of bots to claim every hour")
-    .action((limit, gasPrice, batchSize) => claim({ limit, gasPrice, batchSize }))
+    .description("Total number of bots to claim for every hour, if they have not claimed already")
+    .action(async (limit, gasPrice, batchSize) => {
+        console.log(`Claiming for ${ limit } bots per hour, gas price is ${ gasPrice } gwei, ${ batchSize } requests per second.`)
+
+        try {
+            await claim({ limit, gasPrice, batchSize })
+        } catch(err) {
+            console.log(`\nError: ${ err.message }`)
+        }
+    })
 
 // display public keys
 program

@@ -33,10 +33,10 @@ const erc20Abi = require("./abi/ERC20.js")
 const faucetAbi = require("./abi/faucet.js")
 
 dotenv.config()
-const NETWORK = process.env.NETWORK
-const network = NETWORK === "mainnet" ? mainnet : testnet
 const PROVIDER = process.env.PROVIDER || "https://mainway.freemoon.xyz/gate"
 const MNEMONIC = process.env.MNEMONIC
+
+const network = testnet
 
 const freeAddr = network.freeAddr
 const fmnAddr = network.fmnAddr
@@ -111,10 +111,16 @@ const resolveAllBatches = async (allBatches, finalMsg) => {
     let success = 0, fail = 0
 
     for(let i = 0; i < allBatches.length; i++) {
-        const results = await Promise.allSettled(allBatches[ i ])
-
-        success += results.filter(res => res.status === "fulfilled").length
-        fail += results.filter(res => res.status === "rejected").length
+        const receipts = await Promise.all(allBatches[ i ])
+       
+        for(let j = 0; j < receipts.length; j++) {
+            try {
+                await receipts[ j ].wait()
+                success++
+            } catch(err) {
+                fail++
+            }
+        }
     }
 
     console.log(finalMsg(success, fail))
@@ -130,7 +136,7 @@ const subscribe = async ({ limit, gasPrice, batchSize }) => {
     const transactionCount = await provider.getTransactionCount(publicKeys[ 0 ])
     
     const subCost = await faucet.subscriptionCost()
-    const currentGas = ethers.utils.parseUnits(String(gasPrice), "gwei")
+    const gasPriceGwei = ethers.utils.parseUnits(String(gasPrice), "gwei")
 
     const fsnBal = await provider.getBalance(publicKeys[ 0 ])
     const totalCost = subCost.mul(limit - totalSubbed).add("500000000000000000")
@@ -147,15 +153,16 @@ const subscribe = async ({ limit, gasPrice, batchSize }) => {
         console.log(`\n>>> Building tx batch ${ n } ...`)
         let requests = batch.map((addr, i) => {
             let txNonce = transactionCount + (n * batchSize) + i
-            console.log(`\n\taddress: ${ addr },\n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ currentGas },\n\tvalue: ${ subCost },\n\tnonce: ${ txNonce }`)
+            console.log(`\n\taddress: ${ addr },\n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPrice },\n\tvalue: ${ subCost },\n\tnonce: ${ txNonce }`)
             return faucet.subscribe(addr, {
                 from: publicKeys[ 0 ],
                 gasLimit: "1000000",
-                gasPrice: currentGas,
+                gasPrice: gasPriceGwei,
                 value: subCost,
                 nonce: txNonce
             })
         })
+
         return requests
     }
 
@@ -179,7 +186,57 @@ const subscribe = async ({ limit, gasPrice, batchSize }) => {
 
 
 
-const claim = async (opts) => {}
+const claim = async ({ limit, gasPrice, batchSize }) => {
+    const { provider, signer, faucet } = connect()
+
+    const publicKeys = derivePub(limit, provider)
+    const totalSubbed = await countSubbedBots(limit, provider, faucet)
+    const transactionCount = await provider.getTransactionCount(publicKeys [ 0 ])
+
+    const gasPriceGwei = ethers.utils.parseUnits(String(gasPrice), "gwei")
+    const fsnBal = Number(ethers.utils.formatUnits(await provider.getBalance(publicKeys[ 0 ])))
+
+    if(totalSubbed < limit) throw new Error(`\n>>> Only ${ totalSubbed } bots are subscribed, cannot claim for ${ limit } bots.`)
+    if(fsnBal < 0.5) throw new Error(`\n>>> Leave 0.5 FSN for gas. Current funds: ${ fsnBal }`)
+
+    let batchStart = 0
+    let batchEnd
+    let batchNum = 0
+    let allBatches = []
+
+    const buildTx = (batch, n) => {
+        console.log(`\n>>> Building tx batch ${ n } ...`)
+        let requests = batch.map((addr, i) => {
+            let txNonce = transactionCount + (n * batchSize) + i
+            console.log(`\n\taddress: ${ addr },\n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei },\n\tnonce: ${ txNonce }`)
+            return faucet.claim(addr, {
+                from: publicKeys[ 0 ],
+                gasLimit: gasLimit,
+                gasPrice: gasPriceGwei,
+                nonce: txNonce
+            })
+        })
+
+        return requests
+    }
+
+
+    const claiming = setInterval(async () => {
+        let batch = []
+        batchEnd = limit > (batchStart + batchSize) ? batchStart + batchSize : limit
+        for(let i = batchStart; i < batchEnd; i++) {
+            batch.push(publicKeys[ i ])
+        }
+        let pendingBatch = buildTx(batch, batchNum)
+        allBatches.push(pendingBatch)
+        batchStart = batchEnd
+        batchNum++
+        if(batchEnd === limit) {
+            clearInterval(claiming)
+            await resolveAllBatches(allBatches, (s, f) => (`\n>>> Claiming complete, ${ s } successful, ${ f } unsuccessful.`))
+        }
+    }, 1000)
+}
 
 
 
