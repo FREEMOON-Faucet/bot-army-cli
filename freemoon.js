@@ -28,13 +28,24 @@
 const { ethers } = require("ethers")
 const dotenv = require("dotenv")
 
-const { freeAddr, faucetAddr } = require("./addresses.js")
+const { mainnet, testnet } = require("./addresses.js")
 const erc20Abi = require("./abi/ERC20.js")
 const faucetAbi = require("./abi/faucet.js")
 
 dotenv.config()
+const NETWORK = process.env.NETWORK
+const network = NETWORK === "mainnet" ? mainnet : testnet
 const PROVIDER = process.env.PROVIDER || "https://mainway.freemoon.xyz/gate"
 const MNEMONIC = process.env.MNEMONIC
+
+const freeAddr = network.freeAddr
+const fmnAddr = network.fmnAddr
+const faucetAddr = network.faucetAddr
+
+const gasLimit = "1000000"
+const gasLimitTx = "30000"
+
+
 
 const assert = (cond) => {
     for(let i = 0; i < cond.length; i++) {
@@ -47,6 +58,7 @@ const connect = () => {
     const wallet = ethers.Wallet.fromMnemonic(MNEMONIC)
     const signer = wallet.connect(provider)
     const free = new ethers.Contract(freeAddr, erc20Abi, signer)
+    const fmn = new ethers.Contract(fmnAddr, erc20Abi, signer)
     const faucet = new ethers.Contract(faucetAddr, faucetAbi, signer)
 
     return { provider, wallet, signer, free, faucet }
@@ -119,7 +131,6 @@ const subscribe = async ({ limit, gasPrice, batchSize }) => {
     
     const subCost = await faucet.subscriptionCost()
     const currentGas = ethers.utils.parseUnits(String(gasPrice), "gwei")
-    const gasLimit = "1000000"
 
     const fsnBal = await provider.getBalance(publicKeys[ 0 ])
     const totalCost = subCost.mul(limit - totalSubbed).add("500000000000000000")
@@ -206,7 +217,7 @@ const balances = async ({ limit }) => {
     let freeResults = await Promise.all(freeRequests)
 
     for(let i = 0; i < publicKeys.length; i++) {
-        console.log(`${ publicKeys[ i ] }: FSN: ${ ethers.utils.formatUnits(fsnResults[ i ], 18) }, FREE: ${ ethers.utils.formatUnits(freeResults[ i ], 18) }`)
+        console.log(`${ i + 1 }: ${ publicKeys[ i ] }: FSN: ${ ethers.utils.formatUnits(fsnResults[ i ], 18) }, FREE: ${ ethers.utils.formatUnits(freeResults[ i ], 18) }`)
     }
 }
 
@@ -225,23 +236,56 @@ const subCount = async ({ limit }) => {
 
 
 const transfer = async ({ token, amount, to, from, gasPrice }) => {
-    const { provider, free } = connect()
+    const { provider } = connect()
     
     const limit = from > to ? from : to
 
     const toIndex = to - 1
     const fromIndex = from - 1
 
+    const amountWei = ethers.utils.parseUnits(String(amount), "ether")
+    const gasPriceGwei = ethers.utils.parseUnits(String(gasPrice), "gwei")
+    const gasRequired = gasPriceGwei.mul(gasLimit)
+
     const publicKeys = derivePub(limit)
     const privateKeys = derivePriv(limit)
-    const wallet = new ethers.Wallet(privateKeys[ fromIndex ], provider)
+    const signer = new ethers.Wallet(privateKeys[ fromIndex ], provider)
 
-    console.log(`from: ${ publicKeys[ fromIndex ] } & ${ privateKeys[ fromIndex ] }, to: ${ publicKeys[ toIndex ] }`)
+    const toAddr = publicKeys[ toIndex ]
+
+    const fsnBal = await provider.getBalance(publicKeys[ fromIndex ])
+
+    const insufficientBal = new Error(`Insufficient ${ token } Balance.`)
+    const insufficientGas = new Error(`Insufficient FSN Gas.`)
 
     if(token === "FSN") {
+        const gasRequiredTx = gasPriceGwei.mul(gasLimitTx)
+        if((fsnBal.sub(gasRequiredTx)).lt(amountWei)) throw insufficientBal
+        if((fsnBal.sub(amountWei)).lt(gasRequiredTx)) throw insufficientGas
+
+        await signer.sendTransaction({
+            to: toAddr,
+            value: amountWei,
+            gasPrice: gasPriceGwei,
+            gasLimit: ethers.BigNumber.from(gasLimitTx)
+        })
     } else if(token === "FREE") {
+        const free = new ethers.Contract(freeAddr, erc20Abi, signer)
+        const bal = await free.balanceOf(publicKeys[ fromIndex ])
+        if(bal.lt(amountWei)) throw insufficientBal
+        if(fsnBal.lt(gasRequired)) throw insufficientGas
+
+        await free.transfer(toAddr, amountWei, { gasPrice: gasPriceGwei, gasLimit  })
     } else if(token === "FMN") {
+        const fmn = new ethers.Contract(fmnAddr, erc20Abi, signer)
+        const bal = await fmn.balanceOf(publicKeys[ fromIndex ])
+        if(bal.lt(amountWei)) throw insufficientBal
+        if(fsnBal.lt(gasRequired)) throw insufficientGas
+
+        await fmn.transfer(toAddr, amountWei, { gasPrice: gasPriceGwei, gasLimit })
     }
+    
+    console.log(`\n>>> Success. Run \"balances\" command to verify.`)
 }
 
 
