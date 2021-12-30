@@ -16,12 +16,7 @@
  *  - Display private keys              - privKeys
  *  - Display balances                  - balances
  *  - Display number of subscribed bots - subCount
- *
- * Transfer:
- *  - Distribute FSN                    - distFsn
- *  - Distribute FREE                   - distFree
- *  - Gather FSN                        - gathFsn
- *  - Gather FREE                       - gathFree
+ * 
  */
 
 
