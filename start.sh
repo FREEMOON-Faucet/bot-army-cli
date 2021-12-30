@@ -7,6 +7,8 @@ export MNEMONIC=$MNEMONIC
 
 if [[ -z $PROVIDER ]]; then
     export PROVIDER="https://mainway.freemoon.xyz/gate";
+else
+    export PROVIDER=$PROVIDER;
 fi
 
 echo "Seed phrase set to \"$MNEMONIC"\";

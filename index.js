@@ -61,9 +61,17 @@ program
     .action(async (limit, gasPrice, batchSize) => {
         console.log(`Claiming for ${ limit } bots per hour, gas price is ${ gasPrice } gwei, ${ batchSize } requests per second.`)
 
+        let claiming
+        
         try {
             await claim({ limit, gasPrice, batchSize })
+            // console.log(`Claims complete. Waiting until ${ new Date(Date.now()) } for next claim ...`)
+            claiming = setInterval(async () => {
+                await claim({ limit, gasPrice, batchSize })
+                // console.log(`Claims complete. Waiting until ${ new Date(Date.now()) } for next claim ...`)
+            }, 3601000)
         } catch(err) {
+            clearInterval(claiming)
             console.log(`\nError: ${ err.message }`)
         }
     })

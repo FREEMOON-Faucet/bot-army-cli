@@ -36,7 +36,7 @@ dotenv.config()
 const PROVIDER = process.env.PROVIDER || "https://mainway.freemoon.xyz/gate"
 const MNEMONIC = process.env.MNEMONIC
 
-const network = testnet
+const network = mainnet
 
 const freeAddr = network.freeAddr
 const fmnAddr = network.fmnAddr
@@ -233,7 +233,8 @@ const claim = async ({ limit, gasPrice, batchSize }) => {
         batchNum++
         if(batchEnd === limit) {
             clearInterval(claiming)
-            await resolveAllBatches(allBatches, (s, f) => (`\n>>> Claiming complete, ${ s } successful, ${ f } unsuccessful.`))
+            await resolveAllBatches(allBatches, (s, f) => (`>>> Claiming complete, ${ s } successful, ${ f } unsuccessful.`))
+            console.log(`>>> Waiting until ${ (new Date(Date.now())).toISOString().replace("T", ", ") } for next claim ...`)
         }
     }, 1000)
 }
