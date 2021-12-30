@@ -76,6 +76,8 @@ sudo chmod +x node_modules/bot-army-cli/start.sh
 
 Enter your 12-word seed phrase, followed by your preferred Fusion RPC gateway (defaults to https://mainway.freemoon.xyz/gate).
 
+If you need to re-enter the seed phrase or the provider URL, just run the second command again.
+
 ### Exit the Session
 
 You can now run the Bot Army from the command line. In order to detach from the session (thus allowing you to run 24/7), run ```Ctrl + B``` followed by ```d```. You can view the process running at any time, by running:
