@@ -164,6 +164,18 @@ npx freemoon claim 100 3 5
 
 This command starts the claim process for your bot army. The first argument is the number of subscribed bots to employ per hour. The second argument specifies the gas price in gwei, defaulting to 2 gwei, and the third argument is the requests to make per second, defaulting to 5.
 
+### Distribute
+
+```bash
+npx freemoon distribute FREE 10000 10 3
+```
+
+The distribute function allows you to batch transfer an amount of either FSN, FREE, or FMN from the base address up to a specified number of bot addresses. The first argument is the token to distribute, either FSN, FREE, or FMN. Please ensure you have the funds necessary in your base address. The second argument is the amount to transfer to each address. The third argument is the number of addresses to distribute this amount to each, so if an address already has the amount specified or more, it will get ignored, otherwise it will get filled UP TO that amount. The final argument is the gas price to use, defaulting to 2 gwei.
+
+In the example above, the user wishes to distribute 10 000 FREE to each address up to the 10th, with a gas price of 3 gwei.
+
+NB: The base address is not counted as a recipient of the distribution.
+
 ## Management of Bot Army
 
 - Occasionally you will need to add FSN to the base address, in order to pay for gas. If there isn't enough gas, the bot will close and need to be restarted.
