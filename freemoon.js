@@ -2,21 +2,15 @@
 /*
  * The FREEMOON Faucet Bot Army CLI
  *
- * Operations:
- *  - Run
- *  - List
- *  - Transfer
- *
- * Run:
  *  - Subscribe                         - subscribe
  *  - Claim                             - claim
- *
- * List:
  *  - Display public keys               - pubKeys
  *  - Display private keys              - privKeys
  *  - Display balances                  - balances
  *  - Display number of subscribed bots - subCount
- * 
+ *  - Transfer tokens between accounts  - transfer
+ *  - Distribute tokens to bot balances - distribute
+ *  - Gather tokens from bot balances   - gather
  */
 
 
@@ -39,6 +33,9 @@ const faucetAddr = network.faucetAddr
 
 const gasLimit = "1000000"
 const gasLimitTx = "30000"
+
+const insufficientBal = new Error(`Insufficient ${ token } Balance.`)
+const insufficientGas = new Error(`Insufficient FSN Gas.`)
 
 
 
@@ -151,7 +148,7 @@ const subscribe = async ({ limit, gasPrice, batchSize }) => {
             console.log(`\n\taddress: ${ addr },\n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPrice },\n\tvalue: ${ subCost },\n\tnonce: ${ txNonce }`)
             return faucet.subscribe(addr, {
                 from: publicKeys[ 0 ],
-                gasLimit: "1000000",
+                gasLimit,
                 gasPrice: gasPriceGwei,
                 value: subCost,
                 nonce: txNonce
@@ -186,7 +183,7 @@ const claim = async ({ limit, gasPrice, batchSize }) => {
 
     const publicKeys = derivePub(limit, provider)
     const totalSubbed = await countSubbedBots(limit, provider, faucet)
-    const transactionCount = await provider.getTransactionCount(publicKeys [ 0 ])
+    const transactionCount = await provider.getTransactionCount(publicKeys[ 0 ])
 
     const gasPriceGwei = ethers.utils.parseUnits(String(gasPrice), "gwei")
     const fsnBal = Number(ethers.utils.formatUnits(await provider.getBalance(publicKeys[ 0 ])))
@@ -206,7 +203,7 @@ const claim = async ({ limit, gasPrice, batchSize }) => {
             console.log(`\n\taddress: ${ addr },\n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei },\n\tnonce: ${ txNonce }`)
             return faucet.claim(addr, {
                 from: publicKeys[ 0 ],
-                gasLimit: gasLimit,
+                gasLimit,
                 gasPrice: gasPriceGwei,
                 nonce: txNonce
             })
@@ -307,10 +304,7 @@ const transfer = async ({ token, amount, to, from, gasPrice }) => {
     const toAddr = publicKeys[ toIndex ]
 
     const fsnBal = await provider.getBalance(publicKeys[ fromIndex ])
-
-    const insufficientBal = new Error(`Insufficient ${ token } Balance.`)
-    const insufficientGas = new Error(`Insufficient FSN Gas.`)
-
+    
     if(token === "FSN") {
         const gasRequiredTx = gasPriceGwei.mul(gasLimitTx)
         if((fsnBal.sub(gasRequiredTx)).lt(amountWei)) throw insufficientBal
@@ -343,20 +337,118 @@ const transfer = async ({ token, amount, to, from, gasPrice }) => {
 
 
 
-const distFsn = async (opts) => {}
+const distribute = async ({ token, amount, limit, gasPrice }) => {
+    const { provider, signer, free, fmn } = connect()
+    
+    const publicKeys = derivePub(limit, provider)
+    const totalSubbed = await countSubbedBots(limit, provider, faucet)
+    const transactionCount = await provider.getTransactionCount(publicKeys[ 0 ])
+    
+    const gasPriceGwei = ethers.utils.parseUnits(String(gasPrice), "gwei")
+    const fsnBal = await provider.getBalance(publicKeys[ 0 ])
+    const amountEachWei = ethers.utils.parseUnits(String(amount), "ether")
+    const amountWei = amountEachWei.mul(limit)
+
+    if(totalSubbed < limit) throw new Error(`\n>>> Only ${ totalSubbed } bots are subscribed, please subscribe all bots before distribution.`)
+
+    let buildTx
+
+    const buildFsnTx = (batch, n) => {
+        console.log(`\n>>> Building tx batch ${ n } ...`)
+        let requests = batch.map((addr, i) => {
+            let txNonce = transactionCount + (n * batchSize) + i
+            console.log(`\n\taddress: ${ addr },\n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei },\n\tnonce: ${ txNonce }`)
+            return signer.sendTransaction({
+                from: publicKeys[ 0 ],
+                to: addr,
+                value: amountEachWei,
+                gasLimit: ethers.BigNumber.from(gasLimitTx),
+                gasPrice: gasPriceGwei,
+                nonce: txNonce
+            })
+        })
+
+        return requests
+    }
+
+
+    const buildFreeTx = (batch, n) => {
+        console.log(`\n>>> Building tx batch ${ n } ...`)
+        let requests = batch.map((addr, i) => {
+            let txNonce = transactionCount + (n * batchSize) + i
+            console.log(`\n\taddress: ${ addr }, \n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei },\n\tnonce: ${ txNonce }`)
+            return free.transfer(addr, amountEachWei, {
+                gasLimit,
+                gasPrice: gasPriceGwei,
+                nonce: txNonce
+            })
+        })
+
+        return requests
+    }
+
+
+    const buildFmnTx = (batch, n) => {
+        console.log(`\n>>> Building tx batch ${ n } ...`)
+        let requests = batch.map((addr, i) => {
+            let txNonce = transactionCount + (n * batchSize) + i
+            console.log(`\n\taddress: ${ addr }, \n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei },\n\tnonce: ${ txNonce }`)
+            return fmn.transfer(addr, amountEachWei, {
+                gasLimit,
+                gasPrice: gasPriceGwei,
+                nonce: txNonce
+            })
+        })
+
+        return requests
+    }
+
+
+    if(token === "FSN") {
+        const gasRequiredTx = gasPriceGwei.mul(gasLimitTx)
+        if((fsnBal.sub(gasRequiredTx)).lt(amountWei)) throw insufficientBal
+        if((fsnBal.sub(amountWei)).lt(gasRequiredTx)) throw insufficientGas
+        buildTx = buildFsnTx
+    } else if(token === "FREE") {
+        const gasRequired = gasPriceGwei.mul(gasLimit)
+        const bal = await free.balanceOf(publicKeys[ 0 ])
+        if(bal.lt(amountWei)) throw insufficientBal
+        if(fsnBal.lt(gasRequired)) throw insufficientGas
+        buildTx = buildFreeTx
+    } else if(token === "FMN") {
+        const gasRequired = gasPriceGwei.mul(gasLimit)
+        const bal = await free.balanceOf(publicKeys[ 0 ])
+        if(bal.lt(amountWei)) throw insufficientBal
+        if(fsnBal.lt(gasRequired)) throw insufficientGas
+        buildTx = buildFmnTx
+    }
+
+    let batchStart = 0
+    let batchEnd
+    let batchNum = 0
+    let allBatches = []
+
+    const transferring = setInterval(async () => {
+        let batch = []
+        batchEnd = limit > (batchStart + batchSize) ? batchStart + batchSize
+        for(let i = batchStart; i < batchEnd; i++) {
+            batch.push(publicKeys[ i ])
+        }
+        let pendingBatch = buildTx(batch, batchNum)
+        allBatches.push(pendingBatch)
+        batchStart = batchEnd
+        batchNum++
+        if(batchEnd === limit) {
+            clearInterval(claiming)
+            await resolveAllBatches(allBatches, (s, f) => (`>>> Transfer complete, ${ s } successful, ${ f } unsuccessful.`))
+        }
+    }, 1000)
+}
 
 
 
-const distFree = async (opts) => {}
+const gather = async (opts) => {}
 
 
 
-const gathFsn = async (opts) => {}
-
-
-
-const gathFree = async (opts) => {}
-
-
-
-module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount, transfer }
+module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount, transfer, distribute }

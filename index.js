@@ -9,7 +9,8 @@ const {
     privKeys,
     balances,
     subCount,
-    transfer
+    transfer,
+    distribute
 } = require("./freemoon.js")
 
 
@@ -112,12 +113,30 @@ program
     .argument("<to>", "index of to address", myParseInt)
     .argument("[from]", "index of from address", myParseInt, 0)
     .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
-    .description("Transfer either FSN, FREE, or FMN from & to specified adderss indices.")
+    .description("Transfer either FSN, FREE, or FMN from & to specified address indices.")
     .action(async (token, amount, to, from, gasPrice) => {
         console.log(`Transferring ${ amount } ${ token } from address ${ from } to address ${ to }, gas price is ${ gasPrice } gwei.`)
 
         try {
             await transfer({ token, amount, to, from, gasPrice })
+        } catch(err) {
+            console.log(`\nError: ${ err.message }`)
+        }
+    })
+
+// distribute FSN or FREE
+program
+    .command("distribute")
+    .argument("<token>", "token to distribute", myToken)
+    .argument("<amount>", "max amount to have in each account")
+    .argument("<limit>", "max value", myParseInt)
+    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .description("Distribute either FSN, FREE, or FMN to a number of addresses.")
+    .action(async (token, amount, limit, gasPrice) => {
+        console.log(`Distributing max ${ amount } ${ token } to max ${ limit } addresses.`)
+
+        try {
+            await distribute({ token, amount, limit, gasPrice })
         } catch(err) {
             console.log(`\nError: ${ err.message }`)
         }
