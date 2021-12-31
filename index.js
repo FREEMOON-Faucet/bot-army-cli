@@ -66,10 +66,8 @@ program
         
         try {
             await claim({ limit, gasPrice, batchSize })
-            // console.log(`Claims complete. Waiting until ${ new Date(Date.now()) } for next claim ...`)
             claiming = setInterval(async () => {
                 await claim({ limit, gasPrice, batchSize })
-                // console.log(`Claims complete. Waiting until ${ new Date(Date.now()) } for next claim ...`)
             }, 3601000)
         } catch(err) {
             clearInterval(claiming)
@@ -133,7 +131,7 @@ program
     .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
     .description("Distribute either FSN, FREE, or FMN to a number of addresses.")
     .action(async (token, amount, limit, gasPrice) => {
-        console.log(`Distributing max ${ amount } ${ token } to max ${ limit } addresses.`)
+        console.log(`Distributing max ${ amount } ${ token } to max ${ limit } addresses, gas price is ${ gasPrice } gwei.`)
 
         try {
             await distribute({ token, amount, limit, gasPrice })
