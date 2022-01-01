@@ -38,13 +38,6 @@ const insufficientBal = new Error(`Insufficient Balance.`)
 const insufficientGas = new Error(`Insufficient FSN Gas.`)
 
 
-
-const assert = (cond) => {
-    for(let i = 0; i < cond.length; i++) {
-        if(!cond[ i ][ 0 ]) throw new Error(cond[ i ][ 1 ])
-    }
-}
-
 const connect = () => {
     const provider = new ethers.providers.JsonRpcProvider(PROVIDER)
     const wallet = ethers.Wallet.fromMnemonic(MNEMONIC)
