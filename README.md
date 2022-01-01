@@ -6,6 +6,10 @@ Visit the [FREEMOON Faucet](https://freemoonfaucet.xyz) smart contract platform 
 
 For more info and to learn about the FREEMOON Faucet, visit https://www.freemoon.info.
 
+## Update
+
+Run ```npm update``` locally to update to the latest version.
+
 ## Installation and Setup
 
 ### Intro
