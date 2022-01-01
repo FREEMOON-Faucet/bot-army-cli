@@ -5,6 +5,7 @@ const program = new commander.Command()
 const {
     subscribe,
     claim,
+    genSeedPhrase,
     pubKeys,
     privKeys,
     balances,
@@ -75,6 +76,12 @@ program
             console.log(`\nError: ${ err.message }`)
         }
     })
+
+// generate random new seed phrase
+program
+    .command("genSeedPhrase")
+    .description("Generate a new seed phrase to use in the bot army")
+    .action(() => genSeedPhrase())
 
 // display public keys
 program

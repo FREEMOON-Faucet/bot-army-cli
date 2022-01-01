@@ -249,6 +249,15 @@ const claim = async ({ limit, gasPrice, batchSize }) => {
 
 
 
+const genSeedPhrase = () => {
+    const newWallet = ethers.Wallet.createRandom()
+    const phrase = newWallet.mnemonic.phrase
+
+    console.log(`\n>>> New Seed Phrase (write this down):\n${ phrase }`)
+}
+
+
+
 const pubKeys = ({ limit }) => {
     const { provider } = connect()
 
@@ -589,4 +598,4 @@ const gather = async ({ token, amount, limit, gasPrice }) => {
 
 
 
-module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount, transfer, distribute, gather }
+module.exports = { subscribe, claim, genSeedPhrase, pubKeys, privKeys, balances, subCount, transfer, distribute, gather }

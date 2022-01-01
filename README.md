@@ -16,7 +16,9 @@ Run ```npm update``` locally to update to the latest version.
 
 This guide assumes you have access to a basic Ubuntu VPS such as from Contabo (tested on 20.04 and above). Although a VPS is not necessary, it allows for 24/7 runtime with minimal cost.
 
-It also assumes you have a secure 12-word seed phrase and a balance of FSN in the 0 index address, to pay for gas and to subscribe bots.
+If you require a secure new 12-word seed phrase, please see the genSeedPhrase feature below.
+
+It also assumes you have a balance of FSN in the 0 index address, to pay for gas and to subscribe bots.
 
 ### Make FREEMOON Folder
 
@@ -109,6 +111,16 @@ To display commands and their arguments, run:
 ```bash
 npx freemoon --help
 ```
+
+### Generate Seed Phrase
+
+```bash
+npx freemoon genSeedPhrase
+```
+
+The genSeedPhrase command will generate a secure new 12-word seed phrase which can be funded and used for the bot army. Any number of bot addresses can be derived from this phrase. You do not need to do this if you already have a valid seed phrase.
+
+It is generated from cryptographically secure entropy sources.
 
 ### Public Keys
 
