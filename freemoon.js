@@ -333,26 +333,30 @@ const transfer = async ({ token, amount, to, from, gasPrice }) => {
         if((fsnBal.sub(gasRequiredTx)).lt(amountWei)) throw insufficientBal
         if((fsnBal.sub(amountWei)).lt(gasRequiredTx)) throw insufficientGas
 
-        await signer.sendTransaction({
+        const receipt = await signer.sendTransaction({
             to: toAddr,
             value: amountWei,
             gasPrice: gasPriceGwei,
             gasLimit: ethers.BigNumber.from(gasLimitTx)
         })
+
+        await receipt.wait()
     } else if(token === "FREE") {
         const free = new ethers.Contract(freeAddr, erc20Abi, signer)
         const bal = await free.balanceOf(publicKeys[ fromIndex ])
         if(bal.lt(amountWei)) throw insufficientBal
         if(fsnBal.lt(gasRequired)) throw insufficientGas
 
-        await free.transfer(toAddr, amountWei, { gasPrice: gasPriceGwei, gasLimit  })
+        const receipt = await free.transfer(toAddr, amountWei, { gasPrice: gasPriceGwei, gasLimit  })
+        await receipt.wait()
     } else if(token === "FMN") {
         const fmn = new ethers.Contract(fmnAddr, erc20Abi, signer)
         const bal = await fmn.balanceOf(publicKeys[ fromIndex ])
         if(bal.lt(amountWei)) throw insufficientBal
         if(fsnBal.lt(gasRequired)) throw insufficientGas
 
-        await fmn.transfer(toAddr, amountWei, { gasPrice: gasPriceGwei, gasLimit })
+        const receipt = await fmn.transfer(toAddr, amountWei, { gasPrice: gasPriceGwei, gasLimit })
+        await receipt.wait()
     }
     
     console.log(`\n>>> Success. Run \"balances\" command to verify.`)
@@ -449,11 +453,11 @@ const distribute = async ({ token, amount, limit, gasPrice }) => {
         let requests = requiresFunds.map((addr, i) => {
             let txNonce = transactionCount + i
             console.log(`\n\taddress: ${ addr }, \n\tfrom: ${ publicKeys[ 0 ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei },\n\tnonce: ${ txNonce }`)
-            // return fmn.transfer(addr, amountEachWei, {
-            //     gasLimit,
-            //     gasPrice: gasPriceGwei,
-            //     nonce: txNonce
-            // })
+            return fmn.transfer(addr, amountEachWei, {
+                gasLimit,
+                gasPrice: gasPriceGwei,
+                nonce: txNonce
+            })
         })
 
         return requests
@@ -479,8 +483,117 @@ const distribute = async ({ token, amount, limit, gasPrice }) => {
 
 
 
-const gather = async (opts) => {}
+const gather = async ({ token, amount, limit, gasPrice }) => {
+    const { provider, free, fmn } = connect()
+
+    const publicKeys = derivePub(limit, provider)
+    const privateKeys = derivePriv(limit, provider)
+    
+    const gasPriceGwei = ethers.utils.parseUnits(String(gasPrice), "gwei")
+    const gasRequired = gasPriceGwei.mul(gasLimit)
+    const gasRequiredTx = gasPriceGwei.mul(gasLimitTx)
+    
+    const amountEachWei = ethers.utils.parseUnits(String(amount), "ether")
+
+    let buildTx
+
+    const buildFsnTx = async (batch) => {
+        console.log(`\n>>> Building FSN tx, this may take some time ...`)
+        let amountToRemove = []
+        let hasSurplus = []
+
+        for(let i = 1; i < batch.length; i++) {
+            const bal = await provider.getBalance(batch[ i ])
+            if(bal.gt(amountEachWei.add(gasRequiredTx))) {
+                hasSurplus.push(i)
+                amountToRemove.push(bal.sub(amountEachWei.add(gasRequiredTx)))
+            }
+        }
+
+        let requests = hasSurplus.map((keyIndex, i) => {
+            const signer = new ethers.Wallet(privateKeys[ keyIndex ], provider)
+            console.log(`\n\tto: ${ publicKeys[ 0 ] },\n\tfrom: ${ publicKeys[ keyIndex ] },\n\tvalue: ${ ethers.utils.formatUnits(amountToRemove[ i ], "ether") }, \n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei }`)
+            return signer.sendTransaction({
+                from: publicKeys[ keyIndex ],
+                to: publicKeys[ 0 ],
+                value: amountToRemove[ i ],
+                gasLimit: ethers.BigNumber.from(gasLimitTx),
+                gasPrice: gasPriceGwei
+            })
+        })
+
+        return requests
+    }
+
+    const buildFreeTx = async (batch) => {
+        console.log(`\n>>> Building FREE tx, this may take some time ...`)
+        let amountToRemove = []
+        let hasSurplus = []
+
+        for(let i = 1; i < batch.length; i++) {
+            const bal = await free.balanceOf(batch[ i ])
+            if(bal.gt(amountEachWei)) {
+                hasSurplus.push(i)
+                amountToRemove.push(bal.sub(amountEachWei))
+            }
+        }
+
+        let requests = hasSurplus.map((keyIndex, i) => {
+            const signer = new ethers.Wallet(privateKeys[ keyIndex ], provider)
+            const freeWithSigner = new ethers.Contract(freeAddr, erc20Abi, signer)
+            console.log(`\n\tamount: ${ ethers.utils.formatUnits(amountToRemove[ i ], "ether") }\n\tto: ${ publicKeys[ 0 ] },\n\tfrom: ${ publicKeys[ keyIndex ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei }`)
+            return freeWithSigner.transfer(publicKeys[ 0 ], amountToRemove[ i ], {
+                from: publicKeys[ keyIndex ],
+                gasLimit: ethers.BigNumber.from(gasLimit),
+                gasPrice: gasPriceGwei
+            })
+        }) 
+        
+        return requests
+    }
+
+    const buildFmnTx = async (batch) => {
+        console.log(`\n>>> Building FMN tx, this may take some time ...`)
+        let amountToRemove = []
+        let hasSurplus = []
+
+        for(let i = 1; i < batch.length; i++) {
+            const bal = await fmn.balanceOf(batch[ i ])
+            if(bal.gt(amountEachWei)) {
+                hasSurplus.push(i)
+                amountToRemove.push(bal.sub(amountEachWei))
+            }
+        }
+
+        let requests = hasSurplus.map((keyIndex, i) => {
+            const signer = new ethers.Wallet(privateKeys[ keyIndex ], provider)
+            const fmnWithSigner = new ethers.Contract(fmnAddr, erc20Abi, signer)
+            console.log(`\n\tamount: ${ ethers.utils.formatUnits(amountToRemove[ i ], "ether") }\n\tto: ${ publicKeys[ 0 ] },\n\tfrom: ${ publicKeys[ keyIndex ] },\n\tgasLimit: ${ gasLimit },\n\tgasPrice: ${ gasPriceGwei }`)
+            return fmnWithSigner.transfer(publicKeys[ 0 ], amountToRemove[ i ], {
+                from: publicKeys[ keyIndex ],
+                gasLimit: ethers.BigNumber.from(gasLimit),
+                gasPrice: gasPriceGwei
+            })
+        }) 
+        
+        return requests 
+    }
+
+    if(token === "FSN") {
+        buildTx = buildFsnTx
+    } else if(token === "FREE") {
+        buildTx = buildFreeTx
+    } else if(token === "FMN") {
+        buildTx = buildFmnTx
+    }
+
+    const allRequests = await buildTx(publicKeys)
+    if(allRequests.length === 0) throw new Error(`\n>>> No actions taken, make sure each address has enough gas to send its tokens.`)
+    const ignored = (limit - 1) - allRequests.length
+    if(ignored > 0) console.log(`\n>>> ${ ignored } address(es) were ignored due to either not having a surplus balance or not having enough gas to process.`) 
+    await resolveAllRequests(allRequests, (s, f) => (`>>> Transfer complete, ${ s } successful, ${ f } unsuccessful.`))
+}
 
 
 
-module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount, transfer, distribute }
+module.exports = { subscribe, claim, pubKeys, privKeys, balances, subCount, transfer, distribute, gather }

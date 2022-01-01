@@ -176,6 +176,20 @@ In the example above, the user wishes to distribute 10 000 FREE to each address 
 
 NB: The base address is not counted as a recipient of the distribution.
 
+### Gather
+
+```bash
+npx freemoon gather FSN 0.5 20 2
+```
+
+The gather function allows you to batch transfer either FSN, FREE, or FMN from a specified limit of bot addresses, leaving a set balance on each address.
+
+In the example, the user wishes to gather all FSN from the first 20 addresses (to the base address), leaving 0.5 FSN on each address. If an address has 0.5 FSN or less plus some for gas, it is ignored, otherwise the surplus above 0.5 FSN is transferred to base address.
+
+The first argument is the token, either FSN, FREE, or FMN. The second argument is the amount to leave in each address. The third argument is the number of addresses to gather from. Keep in mind although it says the first 20 addresses, the base address is ignored as it is the receiver of the gathered funds. The final argument is the gas price, defaulting to 2 gwei.
+
+NB: The base address is not counted as an address to be gathered from.
+
 ## Management of Bot Army
 
 - Occasionally you will need to add FSN to the base address, in order to pay for gas. If there isn't enough gas, the bot will close and need to be restarted.
@@ -185,3 +199,5 @@ NB: The base address is not counted as a recipient of the distribution.
 - You will need to restart the bot to increase the number of bots you are claiming for.
 
 - If your VPS reboots for any reason, you will need to restart the bot army.
+
+- Over time, there will be a FREE balance built up on the base address, which can be used to supply a new bot in the army with increased odds of winning FMN. In this case, periodically the user can subscribe new addresses. Use the distribute command to fund the new addresses with FREE. If you wish to gather all the FREE, use the gather command but keep in mind you will need to distribute a small amount of FSN to each address for gas first.

@@ -10,7 +10,8 @@ const {
     balances,
     subCount,
     transfer,
-    distribute
+    distribute,
+    gather
 } = require("./freemoon.js")
 
 
@@ -122,7 +123,7 @@ program
         }
     })
 
-// distribute FSN or FREE
+// distribute FSN, FREE, and FMN
 program
     .command("distribute")
     .argument("<token>", "token to distribute", myToken)
@@ -135,6 +136,24 @@ program
 
         try {
             await distribute({ token, amount, limit, gasPrice })
+        } catch(err) {
+            console.log(`\nError: ${ err.message }`)
+        }
+    })
+
+// gather FSN, FREE, and FMN
+program
+    .command("gather")
+    .argument("<token>", "token to gather", myToken)
+    .argument("<amount>", "max amount to leave in each account")
+    .argument("<limit>", "max value", myParseInt)
+    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .description("Gather either FSN, FREE, or FMN from a number of addresses.")
+    .action(async (token, amount, limit, gasPrice) => {
+        console.log(`Gathering max ${ amount } ${ token } from max ${ limit } addresses, gas price is ${ gasPrice } gwei.`)
+
+        try {
+            await gather({ token, amount, limit, gasPrice })
         } catch(err) {
             console.log(`\nError: ${ err.message }`)
         }
