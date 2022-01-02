@@ -70,7 +70,7 @@ program
             await claim({ limit, gasPrice, batchSize })
             claiming = setInterval(async () => {
                 await claim({ limit, gasPrice, batchSize })
-            }, 3601000)
+            }, 3610000)
         } catch(err) {
             clearInterval(claiming)
             console.log(`\nError: ${ err.message }`)
