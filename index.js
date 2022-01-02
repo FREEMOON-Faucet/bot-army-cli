@@ -15,9 +15,14 @@ const {
     gather
 } = require("./freemoon.js")
 
-
 const myParseInt = (value) => {
     const parsedValue = parseInt(value, 10)
+    if(isNaN(parsedValue) || parsedValue < 0) throw new commander.InvalidArgumentError("Not a number.")
+    return parsedValue
+}
+
+const myParseFloat = (value) => {
+    const parsedValue = parseFloat(value, 10)
     if(isNaN(parsedValue) || parsedValue < 0) throw new commander.InvalidArgumentError("Not a number.")
     return parsedValue
 }
@@ -37,7 +42,7 @@ program
 program
     .command("subscribe")
     .argument("<limit>", "total bots to be subscribed", myParseInt)
-    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .argument("[gasPrice]", "gas price in gwei", myParseFloat, 2)
     .argument("[batchSize]", "max transactions submitted per second", myParseInt, 5)
     .description("Total number of bots to subscribe, if not already subscribed")
     .action(async (limit, gasPrice, batchSize) => {
@@ -58,7 +63,7 @@ program
 program
     .command("claim")
     .argument("<limit>", "total bots to claim for every hour")
-    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .argument("[gasPrice]", "gas price in gwei", myParseFloat, 2)
     .argument("[batchSize]", "max transactions submitted per second", myParseInt, 5)
     .description("Total number of bots to claim for every hour, if they have not claimed already")
     .action(async (limit, gasPrice, batchSize) => {
@@ -70,7 +75,7 @@ program
             await claim({ limit, gasPrice, batchSize })
             claiming = setInterval(async () => {
                 await claim({ limit, gasPrice, batchSize })
-            }, 3610000)
+            }, 3720000)
         } catch(err) {
             clearInterval(claiming)
             console.log(`\nError: ${ err.message }`)
@@ -118,7 +123,7 @@ program
     .argument("<amount>", "amount to transfer")
     .argument("<to>", "index of to address", myParseInt)
     .argument("[from]", "index of from address", myParseInt, 0)
-    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .argument("[gasPrice]", "gas price in gwei", myParseFloat, 2)
     .description("Transfer either FSN, FREE, or FMN from & to specified address indices.")
     .action(async (token, amount, to, from, gasPrice) => {
         console.log(`Transferring ${ amount } ${ token } from address ${ from } to address ${ to }, gas price is ${ gasPrice } gwei.`)
@@ -136,7 +141,7 @@ program
     .argument("<token>", "token to distribute", myToken)
     .argument("<amount>", "max amount to have in each account")
     .argument("<limit>", "max value", myParseInt)
-    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .argument("[gasPrice]", "gas price in gwei", myParseFloat, 2)
     .description("Distribute either FSN, FREE, or FMN to a number of addresses.")
     .action(async (token, amount, limit, gasPrice) => {
         console.log(`Distributing max ${ amount } ${ token } to max ${ limit } addresses, gas price is ${ gasPrice } gwei.`)
@@ -154,7 +159,7 @@ program
     .argument("<token>", "token to gather", myToken)
     .argument("<amount>", "max amount to leave in each account")
     .argument("<limit>", "max value", myParseInt)
-    .argument("[gasPrice]", "gas price in gwei", myParseInt, 2)
+    .argument("[gasPrice]", "gas price in gwei", myParseFloat, 2)
     .description("Gather either FSN, FREE, or FMN from a number of addresses.")
     .action(async (token, amount, limit, gasPrice) => {
         console.log(`Gathering max ${ amount } ${ token } from max ${ limit } addresses, gas price is ${ gasPrice } gwei.`)
