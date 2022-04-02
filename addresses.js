@@ -1,7 +1,7 @@
 
 const mainnet = {
-    freeAddr: "0x6403ede3b7604ea4883670c670bea288618bd5f2",
-    fmnAddr: "0xB80A6C4F2a279ec91921ca30da726c534462125C",
+    freeAddr: "0x466f16541685d5648184467f8F83835Cbb837972",
+    fmnAddr: "0x09fF628D21fcc0795E0de4AEf178e3d43Ee44328",
     faucetAddr: "0x1b1459d4b9ed19050ecb1e9959e0d94c0fbe0603"
 }
 
@@ -13,4 +13,5 @@ const testnet = {
 
 
 
-module.exports = { mainnet, testnet}
+module.exports = { mainnet, testnet }
+
